@@ -7,12 +7,13 @@ import { Loader2, LogOut, Utensils, AlertTriangle } from 'lucide-react';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: 'https://w-306-mealy-server.vercel.app',
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  }
-});
+    baseURL: 'https://w-306-mealy-server.vercel.app',
+    withCredentials: true,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  });
 
 function Home({ user }) {
   const [users, setUsers] = useState([]);
@@ -21,10 +22,31 @@ function Home({ user }) {
   const [loading, setLoading] = useState(true);
 
   // Helper function to get auth headers
-  const getAuthHeaders = async () => ({
-    Authorization: `Bearer ${await user.getIdToken()}`,
-    'Cache-Control': 'no-cache'
-  });
+  const getAuthHeaders = async () => {
+    const token = await user.getIdToken();
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Cache-Control': 'no-cache',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    };
+  };
+
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401) {
+          // Handle unauthorized error
+          console.error('Authentication error:', error);
+          handleLogout();
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => api.interceptors.response.eject(interceptor);
+  }, []);
 
   // Firebase messaging setup
   useEffect(() => {
@@ -38,7 +60,10 @@ function Home({ user }) {
         
         await api.post('/api/users/fcm-token', 
           { token }, 
-          { headers: await getAuthHeaders() }
+          { 
+            headers: await getAuthHeaders(),
+            timeout: 10000 // Add timeout
+          }
         );
       } catch (error) {
         console.error('Error setting up notifications:', error);
@@ -53,8 +78,14 @@ function Home({ user }) {
       try {
         const headers = await getAuthHeaders();
         const [usersResponse, scheduleResponse] = await Promise.all([
-          api.get('/api/users', { headers }),
-          api.get('/api/schedule', { headers })
+          api.get('/api/users', { 
+            headers,
+            timeout: 10000 // Add timeout
+          }),
+          api.get('/api/schedule', { 
+            headers,
+            timeout: 10000 // Add timeout
+          })
         ]);
 
         setUsers(usersResponse.data);
@@ -70,7 +101,6 @@ function Home({ user }) {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [user]);
-
   // Meal status update
   useEffect(() => {
     const updateMealStatus = () => {
@@ -99,8 +129,14 @@ function Home({ user }) {
   const markAsAte = async () => {
     try {
       const headers = await getAuthHeaders();
-      await api.post('/api/users/mark-eaten', {}, { headers });
-      const response = await api.get('/api/users', { headers });
+      await api.post('/api/users/mark-eaten', {}, { 
+        headers,
+        timeout: 10000 // Add timeout
+      });
+      const response = await api.get('/api/users', { 
+        headers,
+        timeout: 10000 // Add timeout
+      });
       setUsers(response.data);
     } catch (error) {
       console.error('Error marking as ate:', error);
@@ -110,7 +146,10 @@ function Home({ user }) {
   const reportFoodFinished = async () => {
     try {
       const headers = await getAuthHeaders();
-      const response = await api.post('/api/report-food-finished', {}, { headers });
+      const response = await api.post('/api/report-food-finished', {}, { 
+        headers,
+        timeout: 10000 // Add timeout
+      });
       alert(response.data.message);
     } catch (error) {
       console.error('Error reporting food finished:', error);
