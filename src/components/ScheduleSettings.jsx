@@ -14,7 +14,7 @@ function ScheduleSettings({ user }) {
   useEffect(() => {
     const fetchSchedule = async () => {
       try {
-        const response = await axios.get('http://localhost:3000/api/schedule', {
+        const response = await axios.get('w-306-mealy-server.vercel.app/api/schedule', {
           headers: { Authorization: `Bearer ${await user.getIdToken()}` }
         });
         setSchedule(response.data);
@@ -32,7 +32,7 @@ function ScheduleSettings({ user }) {
     e.preventDefault();
     setSaving(true);
     try {
-      await axios.put('http://localhost:3000/api/schedule', schedule, {
+      await axios.put('w-306-mealy-server.vercel.app/api/schedule', schedule, {
         headers: { Authorization: `Bearer ${await user.getIdToken()}` }
       });
       alert('Schedule updated successfully!');
