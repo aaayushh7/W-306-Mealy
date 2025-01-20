@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { signOut } from 'firebase/auth';
@@ -14,10 +14,13 @@ function Home({ user }) {
   const [schedule, setSchedule] = useState({ lunchTime: '12:00', dinnerTime: '21:00' });
   const [currentMeal, setCurrentMeal] = useState('');
   const [loading, setLoading] = useState(true);
-  const currentMealPeriod = useRef(null);
 
   const currentUser = users.find(u => u.firebaseUid === user.uid);
   const isAway = currentUser?.isAway || false;
+
+  const [currentMealPeriod, setCurrentMealPeriod] = useState(() => {
+    return localStorage.getItem('currentMealPeriod') || 'none';
+  });
 
   // Firebase messaging setup
   useEffect(() => {
@@ -76,9 +79,7 @@ function Home({ user }) {
     const updateMealStatus = async () => {
       const now = new Date();
       const hours = now.getHours();
-      const minutes = now.getMinutes();
-      const currentTime = hours * 60 + minutes;
-  
+      
       let newMealPeriod;
       if (hours >= 7 && hours < 17) {
         newMealPeriod = 'lunch';
@@ -89,8 +90,7 @@ function Home({ user }) {
       }
   
       // Only reset if period changes
-      if (currentMealPeriod.current !== newMealPeriod) {
-        currentMealPeriod.current = newMealPeriod;
+      if (currentMealPeriod !== newMealPeriod) {
         try {
           await axios.post('https://w-306-mealy-server.vercel.app/api/users/reset-eaten', {}, {
             headers: {
@@ -105,6 +105,8 @@ function Home({ user }) {
             }
           });
           setUsers(response.data);
+          setCurrentMealPeriod(newMealPeriod);
+          localStorage.setItem('currentMealPeriod', newMealPeriod);
         } catch (error) {
           console.error('Error resetting eating status:', error);
         }
@@ -120,7 +122,7 @@ function Home({ user }) {
     updateMealStatus();
     const interval = setInterval(updateMealStatus, 60000);
     return () => clearInterval(interval);
-  }, [schedule, user]);
+  }, [schedule, user, currentMealPeriod]);
 
   const markAsAte = async () => {
     try {
@@ -167,7 +169,7 @@ function Home({ user }) {
     try {
       setAwayModeLoading(true);
       await axios.post(
-        'http://localhost:3000/api/users/toggle-away',
+        'https://w-306-mealy-server.vercel.app/api/users/toggle-away',
         {},
         {
           headers: {
