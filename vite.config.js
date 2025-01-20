@@ -7,6 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true
+      },
       manifest: {
         name: 'w-306-mealy',
         short_name: 'mealy',
@@ -52,10 +55,7 @@ export default defineConfig({
             }
           }
         ]
-      },
-      strategies: 'injectManifest',
-      filename: 'sw.js',
-      manifestFilename: 'manifest.webmanifest'
+      }
     })
   ],
   server: {
