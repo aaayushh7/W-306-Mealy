@@ -19,7 +19,7 @@ function Home({ user }) {
         if (permission !== 'granted') return;
         const messaging = getMessaging();
         const token = await getToken(messaging);
-        await axios.post('w-306-mealy-server.vercel.app/api/users/fcm-token', 
+        await axios.post('https://w-306-mealy-server.vercel.app/api/users/fcm-token', 
           { token }, 
           { headers: { Authorization: `Bearer ${await user.getIdToken()}` }}
         );
@@ -35,13 +35,13 @@ function Home({ user }) {
     const fetchData = async () => {
       try {
         const [usersResponse, scheduleResponse] = await Promise.all([
-          axios.get('w-306-mealy-server.vercel.app/api/users', {
+          axios.get('https://w-306-mealy-server.vercel.app/api/users', {
             headers: {
               Authorization: `Bearer ${await user.getIdToken()}`,
               'Cache-Control': 'no-cache'
             }
           }),
-          axios.get('w-306-mealy-server.vercel.app/api/schedule', {
+          axios.get('https://w-306-mealy-server.vercel.app/api/schedule', {
             headers: {
               Authorization: `Bearer ${await user.getIdToken()}`,
               'Cache-Control': 'no-cache'
@@ -90,14 +90,14 @@ function Home({ user }) {
 
   const markAsAte = async () => {
     try {
-      await axios.post('w-306-mealy-server.vercel.app/api/users/mark-eaten', {}, {
+      await axios.post('https://w-306-mealy-server.vercel.app/api/users/mark-eaten', {}, {
         headers: {
           Authorization: `Bearer ${await user.getIdToken()}`,
           'Cache-Control': 'no-cache'
         }
       });
       
-      const response = await axios.get('w-306-mealy-server.vercel.app/api/users', {
+      const response = await axios.get('https://w-306-mealy-server.vercel.app/api/users', {
         headers: {
           Authorization: `Bearer ${await user.getIdToken()}`,
           'Cache-Control': 'no-cache'
@@ -111,7 +111,7 @@ function Home({ user }) {
 
   const reportFoodFinished = async () => {
     try {
-      const response = await axios.post('w-306-mealy-server.vercel.app/api/report-food-finished', {}, {
+      const response = await axios.post('https://w-306-mealy-server.vercel.app/api/report-food-finished', {}, {
         headers: { Authorization: `Bearer ${await user.getIdToken()}` }
       });
       alert(response.data.message);

@@ -18,7 +18,7 @@ function Login() {
       const idToken = await result.user.getIdToken();
       
       try {
-        await axios.post('w-306-mealy-server.vercel.app/api/users/register', {
+        await axios.post('https://w-306-mealy-server.vercel.app/api/users/register', {
           name: result.user.displayName,
           email: result.user.email
         }, {
