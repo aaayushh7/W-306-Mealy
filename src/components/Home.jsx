@@ -1,18 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase-config';
 import { Loader2, LogOut, Utensils, AlertTriangle } from 'lucide-react';
-import { FoodStatusModal, UserRanking } from './FoodStatusModals';
+import { FoodStatusModal, UserRanking, AwayModeButton } from './FoodStatusModals';
 
 function Home({ user }) {
   const [users, setUsers] = useState([]);
+  const [awayModeLoading, setAwayModeLoading] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
+  const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
   const [schedule, setSchedule] = useState({ lunchTime: '12:00', dinnerTime: '21:00' });
   const [currentMeal, setCurrentMeal] = useState('');
   const [loading, setLoading] = useState(true);
+  const currentMealPeriod = useRef(null);
+
+  const currentUser = users.find(u => u.firebaseUid === user.uid);
+  const isAway = currentUser?.isAway || false;
 
   // Firebase messaging setup
   useEffect(() => {
@@ -22,9 +27,9 @@ const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
         if (permission !== 'granted') return;
         const messaging = getMessaging();
         const token = await getToken(messaging);
-        await axios.post('https://w-306-mealy-server.vercel.app/api/users/fcm-token', 
-          { token }, 
-          { headers: { Authorization: `Bearer ${await user.getIdToken()}` }}
+        await axios.post('https://w-306-mealy-server.vercel.app/api/users/fcm-token',
+          { token },
+          { headers: { Authorization: `Bearer ${await user.getIdToken()}` } }
         );
       } catch (error) {
         console.error('Error setting up notifications:', error);
@@ -68,28 +73,54 @@ const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
 
   // Meal status update
   useEffect(() => {
-    const updateMealStatus = () => {
+    const updateMealStatus = async () => {
       const now = new Date();
-      const currentTime = now.getHours() * 60 + now.getMinutes();
-      
-      const lunchStart = 7 * 60 + 30;
-      const lunchEnd = 17 * 60;
-      const dinnerStart = 17 * 60;
-      const dinnerEnd = 7 * 60;
-    
-      if (currentTime >= lunchStart && currentTime < lunchEnd) {
-        setCurrentMeal('Lunch is ready');
-      } else if (currentTime >= dinnerStart || currentTime < dinnerEnd) {
-        setCurrentMeal('Dinner is ready');
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const currentTime = hours * 60 + minutes;
+  
+      let newMealPeriod;
+      if (hours >= 7 && hours < 17) {
+        newMealPeriod = 'lunch';
+      } else if (hours >= 17 || hours < 7) {
+        newMealPeriod = 'dinner';
       } else {
-        setCurrentMeal('No meal is currently scheduled');
+        newMealPeriod = 'none';
       }
+  
+      // Only reset if period changes
+      if (currentMealPeriod.current !== newMealPeriod) {
+        currentMealPeriod.current = newMealPeriod;
+        try {
+          await axios.post('https://w-306-mealy-server.vercel.app/api/users/reset-eaten', {}, {
+            headers: {
+              Authorization: `Bearer ${await user.getIdToken()}`,
+              'Cache-Control': 'no-cache'
+            }
+          });
+          const response = await axios.get('https://w-306-mealy-server.vercel.app/api/users', {
+            headers: {
+              Authorization: `Bearer ${await user.getIdToken()}`,
+              'Cache-Control': 'no-cache'
+            }
+          });
+          setUsers(response.data);
+        } catch (error) {
+          console.error('Error resetting eating status:', error);
+        }
+      }
+  
+      setCurrentMeal(
+        newMealPeriod === 'lunch' ? 'Lunch is ready' :
+        newMealPeriod === 'dinner' ? 'Dinner is ready' :
+        'No meal scheduled'
+      );
     };
-
+  
     updateMealStatus();
     const interval = setInterval(updateMealStatus, 60000);
     return () => clearInterval(interval);
-  }, [schedule]);
+  }, [schedule, user]);
 
   const markAsAte = async () => {
     try {
@@ -99,7 +130,7 @@ const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
           'Cache-Control': 'no-cache'
         }
       });
-      
+
       const response = await axios.get('https://w-306-mealy-server.vercel.app/api/users', {
         headers: {
           Authorization: `Bearer ${await user.getIdToken()}`,
@@ -114,11 +145,9 @@ const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
 
   const reportFoodFinished = async () => {
     try {
-      const response = await axios.post('https://w-306-mealy-server.vercel.app/api/report-food-finished', {}, {
+      await axios.post('https://w-306-mealy-server.vercel.app/api/report-food-finished', {}, {
         headers: { Authorization: `Bearer ${await user.getIdToken()}` }
       });
-      
-      // Show both modals
       setIsStatusModalOpen(true);
       setIsRankingModalOpen(true);
     } catch (error) {
@@ -134,51 +163,79 @@ const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
     }
   };
 
+  const toggleAwayMode = async () => {
+    try {
+      setAwayModeLoading(true);
+      await axios.post(
+        'http://localhost:3000/api/users/toggle-away',
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${await user.getIdToken()}`,
+            'Cache-Control': 'no-cache'
+          }
+        }
+      );
+
+      const response = await axios.get('https://w-306-mealy-server.vercel.app/api/users', {
+        headers: {
+          Authorization: `Bearer ${await user.getIdToken()}`,
+          'Cache-Control': 'no-cache'
+        }
+      });
+      setUsers(response.data);
+    } catch (error) {
+      console.error('Error toggling away mode:', error);
+    } finally {
+      setAwayModeLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900">
-        <Loader2 className="w-12 h-12 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
-      <div className="max-w-lg mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+      <div className="max-w-md mx-auto px-3 py-4">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
             Meal Tracker
           </h1>
           <button
             onClick={handleLogout}
-            className="p-2 text-gray-400 hover:text-gray-200 transition-colors"
+            className="p-1.5 text-gray-400 hover:text-gray-200 transition-colors"
             aria-label="Logout"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
 
         {/* Current Status Section */}
-        <div className="bg-gray-800 rounded-2xl shadow-xl p-6 mb-8 border border-gray-700">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-white">Current Status</h2>
-            <span className="px-4 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm">
+        <div className="bg-gray-800 rounded-xl shadow-lg p-4 mb-4 border border-gray-700">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-white">Current Status</h2>
+            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full text-xs">
               {currentMeal}
             </span>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-2">
             {Array.isArray(users) && users.map((flatmate) => (
               <div
                 key={flatmate._id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-700/50 rounded-xl border border-gray-600"
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 bg-gray-700/50 rounded-lg border border-gray-600"
               >
-                <div className="flex items-center mb-2 sm:mb-0">
-                  <span className="font-medium text-base text-white">
+                <div className="flex items-center mb-1 sm:mb-0">
+                  <span className="text-sm font-medium text-white">
                     {flatmate.name}
                   </span>
                   <span
-                    className={`ml-3 px-3 py-1 text-sm rounded-full ${
+                    className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
                       flatmate.hasEaten
                         ? 'bg-green-500/20 text-green-300'
                         : 'bg-yellow-500/20 text-yellow-300'
@@ -188,7 +245,7 @@ const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
                   </span>
                 </div>
                 {flatmate.lastEatenAt && (
-                  <span className="text-sm text-gray-400">
+                  <span className="text-xs text-gray-400">
                     Last ate at {new Date(flatmate.lastEatenAt).toLocaleTimeString()}
                   </span>
                 )}
@@ -197,35 +254,39 @@ const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
           </div>
         </div>
 
-        {/* Ranking Section */}
-
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 gap-4 mb-8">
+        <div className="grid grid-cols-1 gap-2 mb-4">
+          <AwayModeButton
+            isAway={isAway}
+            onToggle={toggleAwayMode}
+            isLoading={awayModeLoading}
+          />
           <button
             onClick={markAsAte}
-            disabled={Array.isArray(users) && users.find(u => u.firebaseUid === user.uid)?.hasEaten}
-            className="flex items-center justify-center gap-2 bg-blue-600 text-white py-4 px-6 rounded-xl font-medium
+            disabled={isAway || (Array.isArray(users) && users.find(u => u.firebaseUid === user.uid)?.hasEaten)}
+            className="flex items-center justify-center gap-1.5 bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium
                      hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed 
                      active:transform active:scale-95 transition-all"
           >
-            <Utensils className="w-5 h-5" />
+            <Utensils className="w-4 h-4" />
             Mark as ate
           </button>
           
           <button
             onClick={reportFoodFinished}
-            className="flex items-center justify-center gap-2 bg-red-600 text-white py-4 px-6 rounded-xl font-medium
-                     hover:bg-red-500 active:transform active:scale-95 transition-all"
+            disabled={isAway}
+            className="flex items-center justify-center gap-1.5 bg-red-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium
+                     hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed 
+                     active:transform active:scale-95 transition-all"
           >
-            <AlertTriangle className="w-5 h-5" />
+            <AlertTriangle className="w-4 h-4" />
             Report food finished
           </button>
         </div>
 
-        {/* Modal */}
         <UserRanking users={users} />
 
-        <FoodStatusModal 
+        <FoodStatusModal
           isOpen={isStatusModalOpen}
           onClose={() => setIsStatusModalOpen(false)}
           users={users}

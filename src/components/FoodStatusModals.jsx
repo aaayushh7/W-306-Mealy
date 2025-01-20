@@ -1,22 +1,48 @@
 // FoodStatusModal.jsx
 import React from 'react';
 import { X, AlertCircle } from 'lucide-react';
+import { Plane } from 'lucide-react';
+
+export const AwayModeButton = ({ isAway, onToggle, isLoading }) => {
+  return (
+    <button
+      onClick={onToggle}
+      disabled={isLoading}
+      className={`
+        flex items-center justify-center gap-2 py-2 px-6 rounded-xl font-medium
+        transition-all transform active:scale-95
+        ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+        ${isAway 
+          ? 'bg-gray-600 text-gray-300 hover:bg-gray-500' 
+          : 'bg-purple-600 text-white hover:bg-purple-500'}
+      `}
+    >
+      <Plane 
+        className={`w-5 h-5 transition-transform ${isAway ? 'rotate-45' : '-rotate-45'}`} 
+      />
+      {isAway ? 'Enable Account' : 'Going Away'}
+    </button>
+  );
+};
+
 
 export const FoodStatusModal = ({ isOpen, onClose, users }) => {
-  if (!isOpen) return null;
-
-  // Group users by eaten status
-  const { eatenUsers, notEatenUsers } = users.reduce(
-    (acc, user) => {
-      if (user.hasEaten) {
-        acc.eatenUsers.push(user);
-      } else {
-        acc.notEatenUsers.push(user);
-      }
-      return acc;
-    },
-    { eatenUsers: [], notEatenUsers: [] }
-  );
+    if (!isOpen) return null;
+  
+    // Group users by eaten status, excluding away users
+    const { eatenUsers, notEatenUsers, awayUsers } = users.reduce(
+      (acc, user) => {
+        if (user.isAway) {
+          acc.awayUsers.push(user);
+        } else if (user.hasEaten) {
+          acc.eatenUsers.push(user);
+        } else {
+          acc.notEatenUsers.push(user);
+        }
+        return acc;
+      },
+      { eatenUsers: [], notEatenUsers: [], awayUsers: [] }
+    );
 
   // Determine current meal type based on time
   const getCurrentMeal = () => {
@@ -81,6 +107,29 @@ export const FoodStatusModal = ({ isOpen, onClose, users }) => {
                     </div>
                   </div>
                 ))}
+
+                {/* Away Users */}
+          {awayUsers.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-gray-400">
+                <Plane className="w-5 h-5" />
+                <h3 className="font-medium">Away</h3>
+              </div>
+              <div className="space-y-3">
+                {awayUsers.map((user) => (
+                  <div
+                    key={user._id}
+                    className="bg-gray-700/30 rounded-xl p-4 border border-gray-600"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-gray-400">{user.name}</span>
+                      <span className="text-sm text-gray-500">Away</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
               </div>
             </div>
           )}
@@ -101,50 +150,78 @@ export const FoodStatusModal = ({ isOpen, onClose, users }) => {
 
 // UserRanking.jsx
 export const UserRanking = ({ users }) => {
-  // Calculate missed meals count
-  const userRankings = users
-    .filter(user => !user.hasEaten)
-    .map(user => ({
-      ...user,
-      missedMeals: 1 // This should be calculated from historical data
-    }))
-    .sort((a, b) => b.missedMeals - a.missedMeals);
-
-  return (
-    <div className="bg-gray-800 rounded-2xl shadow-xl p-6 mb-8 border border-gray-700">
-      <h2 className="text-xl font-semibold text-white mb-6">Missed Meals Ranking</h2>
-      
-      {userRankings.length > 0 ? (
-        <div className="space-y-4">
-          {userRankings.map((user, index) => (
-            <div
-              key={user._id}
-              className="bg-gray-700/50 rounded-xl p-4 border border-gray-600 transition-all hover:bg-gray-700"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className={`text-lg font-bold ${
-                    index === 0 ? 'text-red-400' : 
-                    index === 1 ? 'text-orange-400' : 
-                    index === 2 ? 'text-yellow-400' : 
-                    'text-blue-400'
-                  }`}>
-                    #{index + 1}
+    // Calculate missed meals count, excluding away users
+    const userRankings = users
+      .filter(user => !user.hasEaten && !user.isAway) // Don't include away users in ranking
+      .map(user => ({
+        ...user,
+        missedMeals: 1
+      }))
+      .sort((a, b) => b.missedMeals - a.missedMeals);
+  
+    // Get list of away users
+    const awayUsers = users.filter(user => user.isAway);
+  
+    return (
+      <div className="bg-gray-800 rounded-2xl shadow-xl p-6 mb-8 border border-gray-700">
+        <h2 className="text-xl font-semibold text-white mb-6">Missed Meals Ranking</h2>
+        
+        {/* Active Users Rankings */}
+        {userRankings.length > 0 ? (
+          <div className="space-y-4">
+            {userRankings.map((user, index) => (
+              <div
+                key={user._id}
+                className="bg-gray-700/50 rounded-xl p-4 border border-gray-600 transition-all hover:bg-gray-700"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className={`text-lg font-bold ${
+                      index === 0 ? 'text-red-400' : 
+                      index === 1 ? 'text-orange-400' : 
+                      index === 2 ? 'text-yellow-400' : 
+                      'text-blue-400'
+                    }`}>
+                      #{index + 1}
+                    </span>
+                    <span className="font-medium text-white">{user.name}</span>
+                  </div>
+                  <span className="text-sm text-gray-400">
+                    {user.missedMeals} missed {user.missedMeals === 1 ? 'meal' : 'meals'}
                   </span>
-                  <span className="font-medium text-white">{user.name}</span>
                 </div>
-                <span className="text-sm text-gray-400">
-                  {user.missedMeals} missed {user.missedMeals === 1 ? 'meal' : 'meals'}
-                </span>
               </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center text-gray-400 py-4">
+            Everyone has eaten! 🎉
+          </div>
+        )}
+  
+        {/* Away Users Section */}
+        {awayUsers.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-gray-700">
+            <h3 className="text-md font-medium text-gray-400 mb-4">Away Users</h3>
+            <div className="space-y-3">
+              {awayUsers.map((user) => (
+                <div
+                  key={user._id}
+                  className="bg-gray-700/30 rounded-xl p-4 border border-gray-600"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-400">{user.name}</span>
+                    <div className="flex items-center gap-2">
+                      <Plane className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-500">Away</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center text-gray-400 py-8">
-          Everyone has eaten! 🎉
-        </div>
-      )}
-    </div>
-  );
-};
+          </div>
+        )}
+      </div>
+    );
+  };
+  
