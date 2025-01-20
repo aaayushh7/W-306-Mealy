@@ -5,37 +5,23 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase-config';
 import { Loader2, LogOut, Utensils, AlertTriangle } from 'lucide-react';
 
-// Create axios instance with default config
-const api = axios.create({
-  baseURL: 'https://w-306-mealy-server.vercel.app',
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache'
-  }
-});
-
 function Home({ user }) {
   const [users, setUsers] = useState([]);
   const [schedule, setSchedule] = useState({ lunchTime: '12:00', dinnerTime: '21:00' });
   const [currentMeal, setCurrentMeal] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const getAuthHeaders = async () => ({
-    Authorization: `Bearer ${await user.getIdToken()}`
-  });
-
+  // Firebase messaging setup
   useEffect(() => {
     const setupFCM = async () => {
       try {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return;
-        
         const messaging = getMessaging();
         const token = await getToken(messaging);
-        await api.post('/api/users/fcm-token', 
+        await axios.post('https://w-306-mealy-server.vercel.app/api/users/fcm-token', 
           { token }, 
-          { headers: await getAuthHeaders() }
+          { headers: { Authorization: `Bearer ${await user.getIdToken()}` }}
         );
       } catch (error) {
         console.error('Error setting up notifications:', error);
@@ -44,13 +30,23 @@ function Home({ user }) {
     setupFCM();
   }, [user]);
 
+  // Data fetching
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const headers = await getAuthHeaders();
         const [usersResponse, scheduleResponse] = await Promise.all([
-          api.get('/api/users', { headers }),
-          api.get('/api/schedule', { headers })
+          axios.get('https://w-306-mealy-server.vercel.app/api/users', {
+            headers: {
+              Authorization: `Bearer ${await user.getIdToken()}`,
+              'Cache-Control': 'no-cache'
+            }
+          }),
+          axios.get('https://w-306-mealy-server.vercel.app/api/schedule', {
+            headers: {
+              Authorization: `Bearer ${await user.getIdToken()}`,
+              'Cache-Control': 'no-cache'
+            }
+          })
         ]);
 
         setUsers(usersResponse.data);
@@ -66,7 +62,6 @@ function Home({ user }) {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [user]);
-
 
   // Meal status update
   useEffect(() => {
