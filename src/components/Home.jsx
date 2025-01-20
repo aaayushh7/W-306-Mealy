@@ -5,48 +5,11 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase-config';
 import { Loader2, LogOut, Utensils, AlertTriangle } from 'lucide-react';
 
-// Create axios instance with default config
-const api = axios.create({
-    baseURL: 'https://w-306-mealy-server.vercel.app',
-    withCredentials: true,
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-  });
-
 function Home({ user }) {
   const [users, setUsers] = useState([]);
   const [schedule, setSchedule] = useState({ lunchTime: '12:00', dinnerTime: '21:00' });
   const [currentMeal, setCurrentMeal] = useState('');
   const [loading, setLoading] = useState(true);
-
-  // Helper function to get auth headers
-  const getAuthHeaders = async () => {
-    const token = await user.getIdToken();
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Cache-Control': 'no-cache',
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    };
-  };
-
-  useEffect(() => {
-    const interceptor = api.interceptors.response.use(
-      response => response,
-      error => {
-        if (error.response?.status === 401) {
-          // Handle unauthorized error
-          console.error('Authentication error:', error);
-          handleLogout();
-        }
-        return Promise.reject(error);
-      }
-    );
-
-    return () => api.interceptors.response.eject(interceptor);
-  }, []);
 
   // Firebase messaging setup
   useEffect(() => {
@@ -54,16 +17,11 @@ function Home({ user }) {
       try {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return;
-        
         const messaging = getMessaging();
         const token = await getToken(messaging);
-        
-        await api.post('/api/users/fcm-token', 
+        await axios.post('https://w-306-mealy-server.vercel.app/api/users/fcm-token', 
           { token }, 
-          { 
-            headers: await getAuthHeaders(),
-            timeout: 10000 // Add timeout
-          }
+          { headers: { Authorization: `Bearer ${await user.getIdToken()}` }}
         );
       } catch (error) {
         console.error('Error setting up notifications:', error);
@@ -76,15 +34,18 @@ function Home({ user }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const headers = await getAuthHeaders();
         const [usersResponse, scheduleResponse] = await Promise.all([
-          api.get('/api/users', { 
-            headers,
-            timeout: 10000 // Add timeout
+          axios.get('https://w-306-mealy-server.vercel.app/api/users', {
+            headers: {
+              Authorization: `Bearer ${await user.getIdToken()}`,
+              'Cache-Control': 'no-cache'
+            }
           }),
-          api.get('/api/schedule', { 
-            headers,
-            timeout: 10000 // Add timeout
+          axios.get('https://w-306-mealy-server.vercel.app/api/schedule', {
+            headers: {
+              Authorization: `Bearer ${await user.getIdToken()}`,
+              'Cache-Control': 'no-cache'
+            }
           })
         ]);
 
@@ -101,16 +62,17 @@ function Home({ user }) {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [user]);
+
   // Meal status update
   useEffect(() => {
     const updateMealStatus = () => {
       const now = new Date();
       const currentTime = now.getHours() * 60 + now.getMinutes();
       
-      const lunchStart = 7 * 60 + 30; // 7:30 AM
-      const lunchEnd = 17 * 60;       // 5:00 PM
-      const dinnerStart = 17 * 60;    // 5:00 PM
-      const dinnerEnd = 7 * 60;       // 7:00 AM next day
+      const lunchStart = 7 * 60 + 30;
+      const lunchEnd = 17 * 60;
+      const dinnerStart = 17 * 60;
+      const dinnerEnd = 7 * 60;
     
       if (currentTime >= lunchStart && currentTime < lunchEnd) {
         setCurrentMeal('Lunch is ready');
@@ -128,14 +90,18 @@ function Home({ user }) {
 
   const markAsAte = async () => {
     try {
-      const headers = await getAuthHeaders();
-      await api.post('/api/users/mark-eaten', {}, { 
-        headers,
-        timeout: 10000 // Add timeout
+      await axios.post('https://w-306-mealy-server.vercel.app/api/users/mark-eaten', {}, {
+        headers: {
+          Authorization: `Bearer ${await user.getIdToken()}`,
+          'Cache-Control': 'no-cache'
+        }
       });
-      const response = await api.get('/api/users', { 
-        headers,
-        timeout: 10000 // Add timeout
+      
+      const response = await axios.get('https://w-306-mealy-server.vercel.app/api/users', {
+        headers: {
+          Authorization: `Bearer ${await user.getIdToken()}`,
+          'Cache-Control': 'no-cache'
+        }
       });
       setUsers(response.data);
     } catch (error) {
@@ -145,10 +111,8 @@ function Home({ user }) {
 
   const reportFoodFinished = async () => {
     try {
-      const headers = await getAuthHeaders();
-      const response = await api.post('/api/report-food-finished', {}, { 
-        headers,
-        timeout: 10000 // Add timeout
+      const response = await axios.post('https://w-306-mealy-server.vercel.app/api/report-food-finished', {}, {
+        headers: { Authorization: `Bearer ${await user.getIdToken()}` }
       });
       alert(response.data.message);
     } catch (error) {
