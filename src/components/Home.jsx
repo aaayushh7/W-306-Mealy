@@ -4,9 +4,12 @@ import { getMessaging, getToken } from 'firebase/messaging';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase-config';
 import { Loader2, LogOut, Utensils, AlertTriangle } from 'lucide-react';
+import { FoodStatusModal, UserRanking } from './FoodStatusModals';
 
 function Home({ user }) {
   const [users, setUsers] = useState([]);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
   const [schedule, setSchedule] = useState({ lunchTime: '12:00', dinnerTime: '21:00' });
   const [currentMeal, setCurrentMeal] = useState('');
   const [loading, setLoading] = useState(true);
@@ -114,7 +117,10 @@ function Home({ user }) {
       const response = await axios.post('https://w-306-mealy-server.vercel.app/api/report-food-finished', {}, {
         headers: { Authorization: `Bearer ${await user.getIdToken()}` }
       });
-      alert(response.data.message);
+      
+      // Show both modals
+      setIsStatusModalOpen(true);
+      setIsRankingModalOpen(true);
     } catch (error) {
       console.error('Error reporting food finished:', error);
     }
@@ -152,6 +158,7 @@ function Home({ user }) {
           </button>
         </div>
 
+        {/* Current Status Section */}
         <div className="bg-gray-800 rounded-2xl shadow-xl p-6 mb-8 border border-gray-700">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-white">Current Status</h2>
@@ -190,7 +197,10 @@ function Home({ user }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4">
+        {/* Ranking Section */}
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-1 gap-4 mb-8">
           <button
             onClick={markAsAte}
             disabled={Array.isArray(users) && users.find(u => u.firebaseUid === user.uid)?.hasEaten}
@@ -211,6 +221,15 @@ function Home({ user }) {
             Report food finished
           </button>
         </div>
+
+        {/* Modal */}
+        <UserRanking users={users} />
+
+        <FoodStatusModal 
+          isOpen={isStatusModalOpen}
+          onClose={() => setIsStatusModalOpen(false)}
+          users={users}
+        />
       </div>
     </div>
   );
