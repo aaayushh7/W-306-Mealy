@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Home, X } from 'lucide-react';
 
 export const MaxUsersModal = ({ isOpen, onClose }) => {
+  useEffect(() => {
+    console.log('Modal isOpen:', isOpen);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -15,7 +19,7 @@ export const MaxUsersModal = ({ isOpen, onClose }) => {
           <Home className="w-12 h-12 text-blue-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">House Full!</h2>
           <p className="text-gray-300 mb-6">
-            Looks like W-306 is already at full capacity with all 5 flatmates registered. Please contact current residents if you believe this is a mistake.
+            W-306 is at full capacity with all 5 flatmates registered. Please contact current residents if you believe this is a mistake.
           </p>
           <button
             onClick={onClose}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth } from '../firebase-config';
 import axios from 'axios';
@@ -12,38 +12,61 @@ function Login() {
   const [showMaxUsersModal, setShowMaxUsersModal] = useState(false);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    // Check for max users error in localStorage
+    const maxUsersError = localStorage.getItem('maxUsersError');
+    if (maxUsersError === 'true') {
+      setShowMaxUsersModal(true);
+      localStorage.removeItem('maxUsersError');
+    }
+  }, []);
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
+    setError(''); // Clear any previous errors
+
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const idToken = await result.user.getIdToken();
-      
-      try {
-        await axios.post('https://w-306-mealy-server.vercel.app/api/users/register', {
-          name: result.user.displayName,
-          email: result.user.email
-        }, {
-          headers: { 
-            'Authorization': `Bearer ${idToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        navigate('/');
-      } catch (apiError) {
-        if (apiError.response?.status === 403) {
-          setShowMaxUsersModal(true);
-          await signOut(auth);
-        } else {
-          console.error('API Error:', apiError);
-          setError('Failed to register user. Please try again.');
-        }
-      }
+
+      await registerUser(result.user, idToken);
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error('Sign-in error:', error);
       setError('Failed to sign in with Google. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const registerUser = async (user, idToken) => {
+    try {
+      const response = await axios.post(
+        'https://w-306-mealy-server.vercel.app/api/users/register',
+        {
+          name: user.displayName,
+          email: user.email
+        },
+        {
+          headers: { Authorization: `Bearer ${idToken}` }
+        }
+      );
+
+      if (response.status === 200) {
+        navigate('/');
+      }
+    } catch (error) {
+      // Sign out the user if registration fails
+      await signOut(auth);
+
+      if (error.response?.data?.error === 'Maximum users reached') {
+        localStorage.setItem('maxUsersError', 'true');
+        setShowMaxUsersModal(true);
+        setError('Maximum number of users reached');
+      } else {
+        console.error('Registration error:', error.response?.data);
+        setError('Registration failed. Please try again later.');
+      }
     }
   };
 
@@ -65,8 +88,9 @@ function Login() {
             onClick={handleGoogleSignIn}
             disabled={loading}
             className="w-full flex items-center justify-center bg-gray-700 rounded-lg px-6 py-3.5 text-white font-medium 
-            transition-all duration-200 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 
-            focus:ring-offset-gray-800 disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
+              transition-all duration-200 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 
+              focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-70 disabled:cursor-not-allowed 
+              group relative overflow-hidden"
           >
             <div className="flex items-center justify-center">
               {loading ? (
@@ -83,7 +107,11 @@ function Login() {
               )}
             </div>
             
-            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <div 
+              className="absolute inset-0 -translate-x-full group-hover:translate-x-full 
+                transition-transform duration-700 bg-gradient-to-r from-transparent 
+                via-white/10 to-transparent" 
+            />
           </button>
         </div>
       </div>
