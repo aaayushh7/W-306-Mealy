@@ -5,8 +5,8 @@ export const MaxUsersModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in">
-      <div className="bg-gray-800 rounded-xl max-w-md w-full p-6 relative animate-in slide-in-from-bottom-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-gray-800 rounded-xl max-w-md w-full p-6 relative">
         <button onClick={onClose} className="absolute right-4 top-4 text-gray-400 hover:text-white">
           <X className="w-5 h-5" />
         </button>
