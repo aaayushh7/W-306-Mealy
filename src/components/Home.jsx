@@ -14,6 +14,8 @@ function Home({ user }) {
   const [schedule, setSchedule] = useState({ lunchTime: '12:00', dinnerTime: '21:00' });
   const [currentMeal, setCurrentMeal] = useState('');
   const [loading, setLoading] = useState(true);
+  const [markAsAteLoading, setMarkAsAteLoading] = useState(false);
+  const [reportFoodLoading, setReportFoodLoading] = useState(false);
 
   const currentUser = users.find(u => u.firebaseUid === user.uid);
   const isAway = currentUser?.isAway || false;
@@ -75,11 +77,12 @@ function Home({ user }) {
   }, [user]);
 
   // Meal status update
+  // Update the meal status effect in the Home component
   useEffect(() => {
     const updateMealStatus = async () => {
       const now = new Date();
       const hours = now.getHours();
-      
+
       let newMealPeriod;
       if (hours >= 7 && hours < 17) {
         newMealPeriod = 'lunch';
@@ -88,22 +91,31 @@ function Home({ user }) {
       } else {
         newMealPeriod = 'none';
       }
-  
+
       // Only reset if period changes
       if (currentMealPeriod !== newMealPeriod) {
         try {
-          await axios.post('https://w-306-mealy-server.vercel.app/api/users/reset-eaten', {}, {
-            headers: {
-              Authorization: `Bearer ${await user.getIdToken()}`,
-              'Cache-Control': 'no-cache'
+          // Send both the previous and new meal period
+          await axios.post('https://w-306-mealy-server.vercel.app/api/users/reset-eaten',
+            {
+              previousMealPeriod: currentMealPeriod,
+              newMealPeriod: newMealPeriod
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${await user.getIdToken()}`,
+                'Cache-Control': 'no-cache'
+              }
             }
-          });
+          );
+
           const response = await axios.get('https://w-306-mealy-server.vercel.app/api/users', {
             headers: {
               Authorization: `Bearer ${await user.getIdToken()}`,
               'Cache-Control': 'no-cache'
             }
           });
+
           setUsers(response.data);
           setCurrentMealPeriod(newMealPeriod);
           localStorage.setItem('currentMealPeriod', newMealPeriod);
@@ -111,14 +123,14 @@ function Home({ user }) {
           console.error('Error resetting eating status:', error);
         }
       }
-  
+
       setCurrentMeal(
         newMealPeriod === 'lunch' ? 'Lunch is ready' :
-        newMealPeriod === 'dinner' ? 'Dinner is ready' :
-        'No meal scheduled'
+          newMealPeriod === 'dinner' ? 'Dinner is ready' :
+            'No meal scheduled'
       );
     };
-  
+
     updateMealStatus();
     const interval = setInterval(updateMealStatus, 60000);
     return () => clearInterval(interval);
@@ -126,6 +138,7 @@ function Home({ user }) {
 
   const markAsAte = async () => {
     try {
+      setMarkAsAteLoading(true);
       await axios.post('https://w-306-mealy-server.vercel.app/api/users/mark-eaten', {}, {
         headers: {
           Authorization: `Bearer ${await user.getIdToken()}`,
@@ -142,11 +155,14 @@ function Home({ user }) {
       setUsers(response.data);
     } catch (error) {
       console.error('Error marking as ate:', error);
+    } finally {
+      setMarkAsAteLoading(false);
     }
   };
 
   const reportFoodFinished = async () => {
     try {
+      setReportFoodLoading(true);
       await axios.post('https://w-306-mealy-server.vercel.app/api/report-food-finished', {}, {
         headers: { Authorization: `Bearer ${await user.getIdToken()}` }
       });
@@ -154,6 +170,8 @@ function Home({ user }) {
       setIsRankingModalOpen(true);
     } catch (error) {
       console.error('Error reporting food finished:', error);
+    } finally {
+      setReportFoodLoading(false);
     }
   };
 
@@ -237,11 +255,10 @@ function Home({ user }) {
                     {flatmate.name}
                   </span>
                   <span
-                    className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                      flatmate.hasEaten
-                        ? 'bg-green-500/20 text-green-300'
-                        : 'bg-yellow-500/20 text-yellow-300'
-                    }`}
+                    className={`ml-2 px-2 py-0.5 text-xs rounded-full ${flatmate.hasEaten
+                      ? 'bg-green-500/20 text-green-300'
+                      : 'bg-yellow-500/20 text-yellow-300'
+                      }`}
                   >
                     {flatmate.hasEaten ? 'Has eaten' : 'Not eaten yet'}
                   </span>
@@ -265,27 +282,34 @@ function Home({ user }) {
           />
           <button
             onClick={markAsAte}
-            disabled={isAway || (Array.isArray(users) && users.find(u => u.firebaseUid === user.uid)?.hasEaten)}
+            disabled={isAway || markAsAteLoading || (Array.isArray(users) && users.find(u => u.firebaseUid === user.uid)?.hasEaten)}
             className="flex items-center justify-center gap-1.5 bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium
-                     hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed 
-                     active:transform active:scale-95 transition-all"
+               hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed 
+               active:transform active:scale-95 transition-all"
           >
-            <Utensils className="w-4 h-4" />
-            Mark as ate
+            {markAsAteLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Utensils className="w-4 h-4" />
+            )}
+            {markAsAteLoading ? 'Marking...' : 'Mark as ate'}
           </button>
-          
+
           <button
             onClick={reportFoodFinished}
-            disabled={isAway}
+            disabled={isAway || reportFoodLoading}
             className="flex items-center justify-center gap-1.5 bg-red-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium
-                     hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed 
-                     active:transform active:scale-95 transition-all"
+               hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed 
+               active:transform active:scale-95 transition-all"
           >
-            <AlertTriangle className="w-4 h-4" />
-            Report food finished
+            {reportFoodLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <AlertTriangle className="w-4 h-4" />
+            )}
+            {reportFoodLoading ? 'Reporting...' : 'Report food finished'}
           </button>
         </div>
-
         <UserRanking users={users} />
 
         <FoodStatusModal
@@ -294,6 +318,7 @@ function Home({ user }) {
           users={users}
         />
       </div>
+      
     </div>
   );
 }

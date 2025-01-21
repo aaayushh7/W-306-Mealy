@@ -51,15 +51,15 @@ function Login() {
           headers: { Authorization: `Bearer ${idToken}` }
         }
       );
-
+  
       if (response.status === 200) {
         navigate('/');
       }
     } catch (error) {
       // Sign out the user if registration fails
       await signOut(auth);
-
-      if (error.response?.data?.error === 'Maximum users reached') {
+  
+      if (error.response?.status === 403 && error.response?.data?.error === 'Maximum users reached') {
         localStorage.setItem('maxUsersError', 'true');
         setShowMaxUsersModal(true);
         setError('Maximum number of users reached');
