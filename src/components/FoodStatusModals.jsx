@@ -150,23 +150,16 @@ export const FoodStatusModal = ({ isOpen, onClose, users }) => {
 
 // UserRanking.jsx
 export const UserRanking = ({ users }) => {
-    // Calculate missed meals count, excluding away users
     const userRankings = users
-      .filter(user => !user.hasEaten && !user.isAway) // Don't include away users in ranking
-      .map(user => ({
-        ...user,
-        missedMeals: 1
-      }))
-      .sort((a, b) => b.missedMeals - a.missedMeals);
+      .filter(user => !user.isAway)
+      .sort((a, b) => (b.missedMealsCount || 0) - (a.missedMealsCount || 0));
   
-    // Get list of away users
     const awayUsers = users.filter(user => user.isAway);
   
     return (
       <div className="bg-gray-800 rounded-2xl shadow-xl p-6 mb-8 border border-gray-700">
         <h2 className="text-xl font-semibold text-white mb-6">Missed Meals Ranking</h2>
         
-        {/* Active Users Rankings */}
         {userRankings.length > 0 ? (
           <div className="space-y-4">
             {userRankings.map((user, index) => (
@@ -187,7 +180,7 @@ export const UserRanking = ({ users }) => {
                     <span className="font-medium text-white">{user.name}</span>
                   </div>
                   <span className="text-sm text-gray-400">
-                    {user.missedMeals} missed {user.missedMeals === 1 ? 'meal' : 'meals'}
+                    {user.missedMealsCount || 0} missed {user.missedMealsCount === 1 ? 'meal' : 'meals'}
                   </span>
                 </div>
               </div>
@@ -195,11 +188,10 @@ export const UserRanking = ({ users }) => {
           </div>
         ) : (
           <div className="text-center text-gray-400 py-4">
-            Everyone has eaten! 🎉
+            No missed meals tracked yet
           </div>
         )}
   
-        {/* Away Users Section */}
         {awayUsers.length > 0 && (
           <div className="mt-6 pt-6 border-t border-gray-700">
             <h3 className="text-md font-medium text-gray-400 mb-4">Away Users</h3>
@@ -224,4 +216,3 @@ export const UserRanking = ({ users }) => {
       </div>
     );
   };
-  
