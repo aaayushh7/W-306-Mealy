@@ -82,20 +82,13 @@ function Home({ user }) {
     const updateMealStatus = async () => {
       const now = new Date();
       const hours = now.getHours();
-
-      let newMealPeriod;
-      if (hours >= 7 && hours < 17) {
-        newMealPeriod = 'lunch';
-      } else if (hours >= 17 || hours < 7) {
-        newMealPeriod = 'dinner';
-      } else {
-        newMealPeriod = 'none';
-      }
-
+  
+      // Simplified logic - only two periods
+      const newMealPeriod = (hours >= 7 && hours < 17) ? 'lunch' : 'dinner';
+  
       // Only reset if period changes
       if (currentMealPeriod !== newMealPeriod) {
         try {
-          // Send both the previous and new meal period
           await axios.post('https://w-306-mealy-server.vercel.app/api/users/reset-eaten',
             {
               previousMealPeriod: currentMealPeriod,
@@ -108,14 +101,14 @@ function Home({ user }) {
               }
             }
           );
-
+  
           const response = await axios.get('https://w-306-mealy-server.vercel.app/api/users', {
             headers: {
               Authorization: `Bearer ${await user.getIdToken()}`,
               'Cache-Control': 'no-cache'
             }
           });
-
+  
           setUsers(response.data);
           setCurrentMealPeriod(newMealPeriod);
           localStorage.setItem('currentMealPeriod', newMealPeriod);
@@ -123,14 +116,10 @@ function Home({ user }) {
           console.error('Error resetting eating status:', error);
         }
       }
-
-      setCurrentMeal(
-        newMealPeriod === 'lunch' ? 'Lunch is ready' :
-          newMealPeriod === 'dinner' ? 'Dinner is ready' :
-            'No meal scheduled'
-      );
+  
+      setCurrentMeal(newMealPeriod === 'lunch' ? 'Lunch is ready' : 'Dinner is ready');
     };
-
+  
     updateMealStatus();
     const interval = setInterval(updateMealStatus, 60000);
     return () => clearInterval(interval);
@@ -318,7 +307,6 @@ function Home({ user }) {
           users={users}
         />
       </div>
-      
     </div>
   );
 }
